@@ -4,6 +4,9 @@
   "description": "Run: docker compose up -d\r Stop: docker compose down\r Stop + delete db: docker compose down -v",
   "main": "index.js",
   "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
