@@ -1,0 +1,33 @@
+{
+  "name": "posai-backend-recommender",
+  "version": "1.0.0",
+  "description": "Run: docker compose up -d\r Stop: docker compose down\r Stop + delete db: docker compose down -v",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackDOx/POSAI-backend-recommender.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JackDOx/POSAI-backend-recommender/issues"
+  },
+  "homepage": "https://github.com/JackDOx/POSAI-backend-recommender#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.6",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}

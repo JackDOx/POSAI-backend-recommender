@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: posai-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: posai
+      POSTGRES_PASSWORD: posai
+      POSTGRES_DB: posai
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - posai_pg_data:/var/lib/postgresql/data
+
+volumes:
+  posai_pg_data:
