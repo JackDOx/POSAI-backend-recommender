@@ -18,3 +18,43 @@ model User {
   email String @unique
   name  String
 }
+
+// One row per Shopify **variant**
+model ProductVariant {
+  id                BigInt @id   // Shopify variant ID
+  productId         BigInt       // Shopify product ID
+
+  productTitle      String       // product-level title (p.title)
+  variantTitle      String       // variant-level title (v.title)
+
+  price             String
+  inventoryQuantity Int
+}
+
+model OrderLineItem {
+  id            String   @id                // Shopify line_items[i].id
+  orderId       String                       // order.id
+  orderNumber   Int                          // order.order_number
+  orderName     String                       // order.name like "#1001"
+  createdAt     DateTime                     // order.created_at
+  currency      String                       // order.currency
+
+  productId     String?                      // line_item.product_id (nullable)
+  variantId     String?                      // line_item.variant_id (nullable)
+
+  lineItemTitle String                       // line_item.title
+  quantity      Int                          // line_item.quantity
+  price         String                       // line_item.price as string
+  sku           String?                      // line_item.sku
+  isCustomSale  Boolean                      // from _shopify_item_type = custom_sale
+}
+
+model VariantSimilarity {
+  id              Int    @id @default(autoincrement())
+  sourceVariantId String
+  targetVariantId String
+  coCount         Int
+
+  @@index([sourceVariantId])
+  @@index([targetVariantId])
+}

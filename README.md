@@ -8,3 +8,5 @@ Run server: npm run dev
 
 Prisma DB Migration: npx prisma migrate dev --name init
 Format: npx prisma migrate dev --name <name>
+
+POS item-item collaborative filtering using co-occurance "people who have bought X also bought Y"
