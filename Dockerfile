@@ -7,7 +7,7 @@ WORKDIR /app
 # Install dependencies first (better layer caching)
 COPY package*.json ./
 # If you use pnpm/yarn, adjust this accordingly
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Copy the rest of the source code
 COPY tsconfig.json ./
