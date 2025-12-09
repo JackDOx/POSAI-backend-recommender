@@ -58,3 +58,9 @@ model VariantSimilarity {
   @@index([sourceVariantId])
   @@index([targetVariantId])
 }
+
+model RecommenderConfig {
+  id        Int      @id @default(1)
+  metric    String
+  updatedAt DateTime @updatedAt
+}

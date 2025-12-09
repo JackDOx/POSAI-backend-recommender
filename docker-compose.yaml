@@ -5,17 +5,31 @@ services:
     image: postgres:16
     container_name: posai-postgres
     restart: unless-stopped
-
     environment:
       POSTGRES_USER: posai
       POSTGRES_PASSWORD: posai
       POSTGRES_DB: posai
-
     ports:
       - "5432:5432"
-
     volumes:
       - posai_pg_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    container_name: posai-recommender
+    restart: unless-stopped
+
+    depends_on:
+      - postgres
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql://posai:posai@postgres:5432/posai
+
+    ports:
+      - "3000:3000" # host:container
 
 volumes:
   posai_pg_data:

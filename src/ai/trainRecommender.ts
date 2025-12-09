@@ -1,7 +1,7 @@
-// src/training/trainRecommender.ts
+// src/ai/trainRecommender.ts
 import { db } from "../db";
 
-// Treat variant IDs as strings in JS, even if they are BIGINT in Postgres.
+// Treat variant IDs as strings in JS
 type VariantId = string;
 
 interface OrderRow {
@@ -25,45 +25,41 @@ interface EvalResult {
   recallAtK: number;
 }
 
+// 🔹 Use OrderLineItem instead of the non-existent Order / OrderItem
 async function fetchOrders(): Promise<OrderBasket[]> {
-  // Adjust table/column names if needed
   const { rows } = await db.query<OrderRow>(
     `
     SELECT
-      o.id AS order_id,
-      o."createdAt" AS created_at,
-      oi."variantId"::text AS variant_id
-    FROM "Order" o
-    JOIN "OrderItem" oi
-      ON oi."orderId" = o.id
-    ORDER BY o."createdAt" ASC
+      "orderId"   AS order_id,
+      "createdAt" AS created_at,
+      "variantId" AS variant_id
+    FROM "OrderLineItem"
+    WHERE "variantId" IS NOT NULL
+    ORDER BY "createdAt" ASC
     `
   );
 
-  // Group rows by order_id
   const map = new Map<string, { createdAt: Date; variants: Set<VariantId> }>();
 
   for (const row of rows) {
     if (!map.has(row.order_id)) {
       map.set(row.order_id, {
         createdAt: row.created_at,
-        variants: new Set<VariantId>()
+        variants: new Set<VariantId>(),
       });
     }
+    // variantId is already text in DB, we keep it as string
     map.get(row.order_id)!.variants.add(row.variant_id);
   }
 
   const baskets: OrderBasket[] = [];
   for (const [orderId, { createdAt, variants }] of map.entries()) {
-    // Only keep orders with at least 2 distinct variants,
-    // otherwise they don't help with co-occurrence.
-    if (variants.size >= 2) {
-      baskets.push({
-        orderId,
-        createdAt,
-        variants: Array.from(variants)
-      });
-    }
+    // ✅ Keep ALL orders with at least 1 variant
+    baskets.push({
+      orderId,
+      createdAt,
+      variants: Array.from(variants),
+    });
   }
 
   return baskets;
@@ -73,7 +69,7 @@ function trainTestSplitByTime(
   orders: OrderBasket[],
   trainRatio = 0.8
 ): { train: OrderBasket[]; val: OrderBasket[] } {
-  // orders are already sorted by createdAt ASC from SQL
+  // orders already sorted by createdAt ASC from SQL
   const n = orders.length;
   const splitIndex = Math.floor(n * trainRatio);
   const train = orders.slice(0, splitIndex);
@@ -93,30 +89,31 @@ function buildStats(trainOrders: OrderBasket[]): Stats {
   const pairCounts = new Map<string, number>();
   const adjacency = new Map<VariantId, Set<VariantId>>();
 
-  const mkKey = (a: VariantId, b: VariantId) => {
-    return a < b ? `${a}|${b}` : `${b}|${a}`;
-  };
+  const mkKey = (a: VariantId, b: VariantId) =>
+    a < b ? `${a}|${b}` : `${b}|${a}`;
 
   for (const order of trainOrders) {
     const variants = order.variants;
     const unique = Array.from(new Set(variants));
 
-    // count single appearances
+    // 🔹 Count single appearances (includes single-item orders)
     for (const v of unique) {
       variantCounts.set(v, (variantCounts.get(v) || 0) + 1);
       if (!adjacency.has(v)) adjacency.set(v, new Set());
     }
 
-    // count pairs
-    for (let i = 0; i < unique.length; i++) {
-      for (let j = i + 1; j < unique.length; j++) {
-        const a = unique[i];
-        const b = unique[j];
-        const key = mkKey(a, b);
-        pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
+    // 🔹 Count pairs only if there are at least 2 items
+    if (unique.length >= 2) {
+      for (let i = 0; i < unique.length; i++) {
+        for (let j = i + 1; j < unique.length; j++) {
+          const a = unique[i];
+          const b = unique[j];
+          const key = mkKey(a, b);
+          pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
 
-        adjacency.get(a)!.add(b);
-        adjacency.get(b)!.add(a);
+          adjacency.get(a)!.add(b);
+          adjacency.get(b)!.add(a);
+        }
       }
     }
   }
@@ -125,7 +122,7 @@ function buildStats(trainOrders: OrderBasket[]): Stats {
     numTrainOrders: trainOrders.length,
     variantCounts,
     pairCounts,
-    adjacency
+    adjacency,
   };
 }
 
@@ -162,7 +159,6 @@ function makeScoreFn(
 
       case "lift": {
         // lift(A,B) = P(A,B) / (P(A) * P(B))
-        // where P(A) = countA / N, P(B) = countB / N, P(A,B) = co / N
         const N = numTrainOrders;
         if (N === 0) return 0;
         const pAB = co / N;
@@ -189,7 +185,6 @@ function recommendForCart(
   const cartSet = new Set(cart);
   const candidateScores = new Map<VariantId, number>();
 
-  // Gather all neighbors of anything in the cart
   for (const a of cart) {
     const neighbors = adjacency.get(a);
     if (!neighbors) continue;
@@ -202,7 +197,6 @@ function recommendForCart(
     }
   }
 
-  // Sort by score desc, then by id as tiebreaker
   const sorted = Array.from(candidateScores.entries())
     .sort(([, s1], [, s2]) => s2 - s1)
     .map(([variantId]) => variantId);
@@ -227,8 +221,7 @@ function evaluateMetric(
     const variants = order.variants;
     if (variants.length < 2) continue;
 
-    // simple "leave-one-out" split:
-    // cart = all but last, heldOut = last
+    // Leave-one-out: cart = all but last, heldOut = last
     const cart = variants.slice(0, variants.length - 1);
     const heldOut = [variants[variants.length - 1]];
 
@@ -261,14 +254,14 @@ function evaluateMetric(
     metric,
     hitRateAtK: sumHit / nUsed,
     precisionAtK: sumPrecision / nUsed,
-    recallAtK: sumRecall / nUsed
+    recallAtK: sumRecall / nUsed,
   };
 }
 
 async function main() {
   console.log("Fetching orders...");
   const baskets = await fetchOrders();
-  console.log(`Total orders with >=2 items: ${baskets.length}`);
+  console.log(`Total orders (>=1 item): ${baskets.length}`);
 
   if (baskets.length < 5) {
     console.log("Not enough data to evaluate. Need more orders.");
@@ -285,7 +278,7 @@ async function main() {
     "cooccurrence",
     "cosine",
     "confidence",
-    "lift"
+    "lift",
   ];
 
   const results: EvalResult[] = [];
@@ -306,7 +299,7 @@ async function main() {
     );
   }
 
-  // pick metric with best HitRate@2 (you can change to precision/recall)
+  // pick metric with best HitRate@2 (change to precision/recall if you prefer)
   let best = results[0];
   for (const r of results.slice(1)) {
     if (r.hitRateAtK > best.hitRateAtK) best = r;
@@ -321,8 +314,20 @@ async function main() {
     )}, Recall@2=${best.recallAtK.toFixed(3)}`
   );
 
-  // TODO (optional): write best.metric into a config table or file.
-  // For now we just print it.
+  // 🔥 Persist the chosen metric into RecommenderConfig
+  await db.query(
+    `
+    INSERT INTO "RecommenderConfig" ("id", "metric", "updatedAt")
+    VALUES (1, $1, NOW())
+    ON CONFLICT ("id")
+    DO UPDATE
+      SET "metric" = EXCLUDED."metric",
+          "updatedAt" = NOW();
+    `,
+    [best.metric]
+  );
+
+  console.log(`\nSaved best metric "${best.metric}" to RecommenderConfig (id=1).`);
 }
 
 main()
