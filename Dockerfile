@@ -13,6 +13,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 
 # If you use Prisma (you do, from schema.prisma):
 RUN npx prisma generate
