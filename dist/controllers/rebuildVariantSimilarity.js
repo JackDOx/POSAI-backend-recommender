@@ -2,8 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.rebuildVariantSimilarity = rebuildVariantSimilarity;
 const db_1 = require("../db");
-const getShopifyOrders_1 = require("./getShopifyOrders");
-const getShopifyProducts_1 = require("./getShopifyProducts");
 /**
  * DEV-ONLY endpoint: recompute item–item similarities from all orders.
  * Assumes:
@@ -13,8 +11,6 @@ const getShopifyProducts_1 = require("./getShopifyProducts");
  */
 async function rebuildVariantSimilarity(req, res) {
     try {
-        await (0, getShopifyProducts_1.getShopifyProducts)(req, res); // ensure we have latest products
-        await (0, getShopifyOrders_1.syncShopifyOrders)(req, res); // ensure we have latest orders
         // 1. Clear existing similarity rows
         await db_1.db.query(`TRUNCATE TABLE "VariantSimilarity"`);
         // 2. Compute co-occurrence counts

@@ -11,7 +11,7 @@ export async function getRecommendations(req: Request, res: Response) {
     const cartVariantIds: string[] = req.body?.cartVariantIds || [];
 
     if (!Array.isArray(cartVariantIds) || cartVariantIds.length === 0) {
-      return res.json({ recommendations: [] });
+      return res.json({ metric: null, recommendations: [] });
     }
 
     // 🔎 Get current metric chosen by training
@@ -57,10 +57,12 @@ export async function getRecommendations(req: Request, res: Response) {
           AND NOT (vs."targetVariantId" = ANY($1::text[]))
       ),
 
-      -- compute metric-dependent score and sum over all cart items
+      -- compute metric-dependent score and sum over all cart items,
+      -- while also tracking which cart variants contributed to each target
       candidate_scores AS (
         SELECT
           cp."targetVariantId" AS "variantId",
+          ARRAY_AGG(DISTINCT cp."sourceVariantId") AS "sourceVariantIds",
           SUM(
             CASE
               WHEN $2 = 'cooccurrence' THEN
@@ -97,6 +99,7 @@ export async function getRecommendations(req: Request, res: Response) {
       SELECT
         cs."variantId",
         cs.score,
+        cs."sourceVariantIds",
         pv."productId",
         pv."productTitle",
         pv."variantTitle",
@@ -112,6 +115,8 @@ export async function getRecommendations(req: Request, res: Response) {
       [cartVariantIds, metric]
     );
 
+    // rows[i].sourceVariantIds will be a string[] of cart variant IDs
+    // that contributed to this recommendation
     res.json({ metric, recommendations: rows });
   } catch (err) {
     console.error("Error getting recommendations:", err);
