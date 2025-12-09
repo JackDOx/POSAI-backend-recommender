@@ -4,6 +4,8 @@
   "description": "Run: docker compose up -d\r Stop: docker compose down\r Stop + delete db: docker compose down -v",
   "main": "index.js",
   "scripts": {
+    "start:prod": "npm run migrate:deploy && node dist/server.js",
+    "migrate:deploy": "prisma migrate deploy",
     "build-and-start": "npm run build && npm run start",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
