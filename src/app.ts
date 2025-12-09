@@ -14,8 +14,6 @@ app.use(
   })
 );
 
-// Explicitly handle preflight for all routes
-app.options('*', cors());
 
 app.use(express.json());
 app.use('/api', routes);
